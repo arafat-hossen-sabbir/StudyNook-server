@@ -3,6 +3,7 @@ const cors = require("cors");
 require("dotenv").config();
 
 const { connectDB } = require("./config/db");
+const roomsRouter = require("./routes/rooms");
 
 const app = express();
 
@@ -16,6 +17,8 @@ app.use(
 );
 
 app.use(express.json());
+
+app.use("/api/rooms", roomsRouter);
 
 app.get("/", (req, res) => {
   res.send("StudyNook server is running");
