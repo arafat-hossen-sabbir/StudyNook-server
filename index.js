@@ -4,6 +4,7 @@ require("dotenv").config();
 
 const { connectDB } = require("./config/db");
 const roomsRouter = require("./routes/rooms");
+const authRouter = require("./routes/auth");
 
 const app = express();
 
@@ -18,11 +19,12 @@ app.use(
 
 app.use(express.json());
 
-app.use("/api/rooms", roomsRouter);
-
 app.get("/", (req, res) => {
   res.send("StudyNook server is running");
 });
+
+app.use("/api/rooms", roomsRouter);
+app.use("/api/auth", authRouter);
 
 const startServer = async () => {
   await connectDB();
