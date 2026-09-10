@@ -5,7 +5,6 @@ const verifyToken = require("../middleware/auth");
 
 const router = express.Router();
 
-// Create a booking
 router.post("/", verifyToken, async (req, res) => {
   try {
     const { roomId, bookingDate, startTime, endTime, specialNote } = req.body;
@@ -16,9 +15,35 @@ router.post("/", verifyToken, async (req, res) => {
       });
     }
 
+    const today = new Date();
+    const selectedDate = new Date(`${bookingDate}T00:00:00`);
+
+    if (selectedDate < new Date(today.toDateString())) {
+      return res.status(400).send({
+        message: "Booking date must be today or a future date",
+      });
+    }
+
     if (startTime >= endTime) {
       return res.status(400).send({
         message: "End time must be after start time",
+      });
+    }
+
+    const startHour = Number(startTime.split(":")[0]);
+    const endHour = Number(endTime.split(":")[0]);
+
+    if (startHour < 8 || endHour > 20) {
+      return res.status(400).send({
+        message: "Booking time must be between 08:00 and 20:00",
+      });
+    }
+
+    const duration = endHour - startHour;
+
+    if (duration < 1) {
+      return res.status(400).send({
+        message: "Minimum booking duration is 1 hour",
       });
     }
 
@@ -34,14 +59,17 @@ router.post("/", verifyToken, async (req, res) => {
       });
     }
 
-    const startHour = Number(startTime.split(":")[0]);
-    const endHour = Number(endTime.split(":")[0]);
+    const conflictingBooking = await db.collection("bookings").findOne({
+      roomId: new ObjectId(roomId),
+      bookingDate,
+      status: "confirmed",
+      startTime: { $lt: endTime },
+      endTime: { $gt: startTime },
+    });
 
-    const duration = endHour - startHour;
-
-    if (duration < 1) {
-      return res.status(400).send({
-        message: "Minimum booking duration is 1 hour",
+    if (conflictingBooking) {
+      return res.status(409).send({
+        message: "This room is already booked for the selected time",
       });
     }
 
@@ -61,6 +89,17 @@ router.post("/", verifyToken, async (req, res) => {
     };
 
     const result = await db.collection("bookings").insertOne(booking);
+
+    await db.collection("users").updateOne(
+      {
+        _id: new ObjectId(req.user.userId),
+      },
+      {
+        $push: {
+          bookings: result.insertedId,
+        },
+      },
+    );
 
     res.status(201).send({
       message: "Booking created successfully",
