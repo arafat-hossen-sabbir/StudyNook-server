@@ -112,4 +112,114 @@ router.post("/", verifyToken, async (req, res) => {
   }
 });
 
+router.get("/my-bookings", verifyToken, async (req, res) => {
+  try {
+    const db = getDB();
+
+    const bookings = await db
+      .collection("bookings")
+      .aggregate([
+        {
+          $match: {
+            userId: req.user.userId,
+          },
+        },
+        {
+          $lookup: {
+            from: "rooms",
+            localField: "roomId",
+            foreignField: "_id",
+            as: "room",
+          },
+        },
+        {
+          $unwind: "$room",
+        },
+        {
+          $sort: {
+            bookingDate: 1,
+            startTime: 1,
+          },
+        },
+      ])
+      .toArray();
+
+    res.send(bookings);
+  } catch (error) {
+    res.status(500).send({
+      message: "Failed to fetch bookings",
+    });
+  }
+});
+
+router.patch("/:id/cancel", verifyToken, async (req, res) => {
+  try {
+    const db = getDB();
+
+    const bookingId = new ObjectId(req.params.id);
+
+    const booking = await db.collection("bookings").findOne({
+      _id: bookingId,
+    });
+
+    if (!booking) {
+      return res.status(404).send({
+        message: "Booking not found",
+      });
+    }
+
+    if (booking.userId !== req.user.userId) {
+      return res.status(403).send({
+        message: "You can only cancel your own booking",
+      });
+    }
+
+    if (booking.status !== "confirmed") {
+      return res.status(400).send({
+        message: "Only confirmed bookings can be cancelled",
+      });
+    }
+
+    const today = new Date();
+    const bookingDate = new Date(`${booking.bookingDate}T00:00:00`);
+
+    if (bookingDate < new Date(today.toDateString())) {
+      return res.status(400).send({
+        message: "Past bookings cannot be cancelled",
+      });
+    }
+
+    await db.collection("bookings").updateOne(
+      {
+        _id: bookingId,
+      },
+      {
+        $set: {
+          status: "cancelled",
+          cancelledAt: new Date(),
+        },
+      },
+    );
+
+    await db.collection("users").updateOne(
+      {
+        _id: new ObjectId(req.user.userId),
+      },
+      {
+        $pull: {
+          bookings: bookingId,
+        },
+      },
+    );
+
+    res.send({
+      message: "Booking cancelled successfully",
+    });
+  } catch (error) {
+    res.status(500).send({
+      message: "Failed to cancel booking",
+    });
+  }
+});
+
 module.exports = router;
