@@ -1,6 +1,7 @@
 const express = require("express");
 const { ObjectId } = require("mongodb");
 const { getDB } = require("../config/db");
+const validateRoom = require("../utils/roomValidation");
 
 const router = express.Router();
 
@@ -24,6 +25,14 @@ router.get("/", async (req, res) => {
 
 router.post("/", async (req, res) => {
   try {
+    const validationError = validateRoom(req.body);
+
+    if (validationError) {
+      return res.status(400).send({
+        message: validationError,
+      });
+    }
+
     const db = getDB();
 
     const room = {
@@ -69,6 +78,18 @@ router.get("/:id", async (req, res) => {
 
 router.patch("/:id", async (req, res) => {
   try {
+    if (req.body.capacity !== undefined && Number(req.body.capacity) < 1) {
+      return res.status(400).send({
+        message: "Capacity must be at least 1",
+      });
+    }
+
+    if (req.body.hourlyRate !== undefined && Number(req.body.hourlyRate) < 0) {
+      return res.status(400).send({
+        message: "Hourly rate cannot be negative",
+      });
+    }
+
     const db = getDB();
 
     const roomId = new ObjectId(req.params.id);
@@ -101,36 +122,26 @@ router.patch("/:id", async (req, res) => {
   }
 });
 
-router.patch("/:id", async (req, res) => {
+router.delete("/:id", async (req, res) => {
   try {
     const db = getDB();
 
-    const roomId = new ObjectId(req.params.id);
+    const result = await db.collection("rooms").deleteOne({
+      _id: new ObjectId(req.params.id),
+    });
 
-    const updateData = {
-      ...req.body,
-      updatedAt: new Date(),
-    };
-
-    const result = await db.collection("rooms").updateOne(
-      { _id: roomId },
-      {
-        $set: updateData,
-      },
-    );
-
-    if (result.matchedCount === 0) {
+    if (result.deletedCount === 0) {
       return res.status(404).send({
         message: "Room not found",
       });
     }
 
     res.send({
-      message: "Room updated successfully",
+      message: "Room deleted successfully",
     });
   } catch (error) {
     res.status(500).send({
-      message: "Failed to update room",
+      message: "Failed to delete room",
     });
   }
 });
