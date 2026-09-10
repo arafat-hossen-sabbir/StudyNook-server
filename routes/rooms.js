@@ -8,11 +8,61 @@ const router = express.Router();
 
 router.get("/", async (req, res) => {
   try {
+    const { search, amenities, minPrice, maxPrice, floor } = req.query;
+
     const db = getDB();
+
+    const filter = {};
+
+    if (search) {
+      filter.$or = [
+        {
+          name: {
+            $regex: search,
+            $options: "i",
+          },
+        },
+        {
+          description: {
+            $regex: search,
+            $options: "i",
+          },
+        },
+      ];
+    }
+
+    if (amenities) {
+      const amenityList = amenities
+        .split(",")
+        .map((amenity) => amenity.trim())
+        .filter(Boolean);
+
+      if (amenityList.length > 0) {
+        filter.amenities = {
+          $in: amenityList,
+        };
+      }
+    }
+
+    if (floor) {
+      filter.floor = floor;
+    }
+
+    if (minPrice || maxPrice) {
+      filter.hourlyRate = {};
+
+      if (minPrice) {
+        filter.hourlyRate.$gte = Number(minPrice);
+      }
+
+      if (maxPrice) {
+        filter.hourlyRate.$lte = Number(maxPrice);
+      }
+    }
 
     const rooms = await db
       .collection("rooms")
-      .find()
+      .find(filter)
       .sort({ createdAt: -1 })
       .toArray();
 
