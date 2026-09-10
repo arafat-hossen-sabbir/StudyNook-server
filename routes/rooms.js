@@ -2,6 +2,7 @@ const express = require("express");
 const { ObjectId } = require("mongodb");
 const { getDB } = require("../config/db");
 const validateRoom = require("../utils/roomValidation");
+const verifyToken = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -23,7 +24,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.post("/", async (req, res) => {
+router.post("/", verifyToken, async (req, res) => {
   try {
     const validationError = validateRoom(req.body);
 
@@ -37,6 +38,7 @@ router.post("/", async (req, res) => {
 
     const room = {
       ...req.body,
+      ownerId: req.user.userId,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -76,7 +78,7 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-router.patch("/:id", async (req, res) => {
+router.patch("/:id", verifyToken, async (req, res) => {
   try {
     if (req.body.capacity !== undefined && Number(req.body.capacity) < 1) {
       return res.status(400).send({
@@ -93,6 +95,22 @@ router.patch("/:id", async (req, res) => {
     const db = getDB();
 
     const roomId = new ObjectId(req.params.id);
+
+    const room = await db.collection("rooms").findOne({
+      _id: roomId,
+    });
+
+    if (!room) {
+      return res.status(404).send({
+        message: "Room not found",
+      });
+    }
+
+    if (room.ownerId !== req.user.userId) {
+      return res.status(403).send({
+        message: "You can only update your own room",
+      });
+    }
 
     const updateData = {
       ...req.body,
@@ -122,9 +140,25 @@ router.patch("/:id", async (req, res) => {
   }
 });
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", verifyToken, async (req, res) => {
   try {
     const db = getDB();
+
+    const room = await db.collection("rooms").findOne({
+      _id: new ObjectId(req.params.id),
+    });
+
+    if (!room) {
+      return res.status(404).send({
+        message: "Room not found",
+      });
+    }
+
+    if (room.ownerId !== req.user.userId) {
+      return res.status(403).send({
+        message: "You can only delete your own room",
+      });
+    }
 
     const result = await db.collection("rooms").deleteOne({
       _id: new ObjectId(req.params.id),
