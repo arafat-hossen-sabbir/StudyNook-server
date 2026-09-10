@@ -5,6 +5,7 @@ require("dotenv").config();
 const { connectDB } = require("./config/db");
 const roomsRouter = require("./routes/rooms");
 const authRouter = require("./routes/auth");
+const bookingsRouter = require("./routes/bookings");
 const cookieParser = require("cookie-parser");
 
 const app = express();
@@ -27,6 +28,7 @@ app.get("/", (req, res) => {
 
 app.use("/api/rooms", roomsRouter);
 app.use("/api/auth", authRouter);
+app.use("/api/bookings", bookingsRouter);
 
 const startServer = async () => {
   await connectDB();
