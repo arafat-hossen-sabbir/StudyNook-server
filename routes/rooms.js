@@ -106,6 +106,26 @@ router.post("/", verifyToken, async (req, res) => {
   }
 });
 
+router.get("/my-listings", verifyToken, async (req, res) => {
+  try {
+    const db = getDB();
+
+    const rooms = await db
+      .collection("rooms")
+      .find({
+        ownerId: req.user.userId,
+      })
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    res.send(rooms);
+  } catch (error) {
+    res.status(500).send({
+      message: "Failed to fetch your listings",
+    });
+  }
+});
+
 router.get("/:id", async (req, res) => {
   try {
     const db = getDB();
