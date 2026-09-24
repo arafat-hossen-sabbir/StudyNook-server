@@ -14,7 +14,7 @@ const port = process.env.PORT || 5000;
 
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: ["http://localhost:5173", "https://your-client-deployed-url.com"],
     credentials: true,
   }),
 );
