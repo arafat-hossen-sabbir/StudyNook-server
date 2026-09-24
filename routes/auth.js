@@ -1,5 +1,6 @@
 const express = require("express");
 const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
 const { ObjectId } = require("mongodb");
 const { getDB } = require("../config/db");
 const verifyToken = require("../middleware/auth");
@@ -29,11 +30,13 @@ router.post("/register", async (req, res) => {
       });
     }
 
+    const hashedPassword = await bcrypt.hash(password, 10);
+
     const user = {
       name,
       email,
       photoURL: photoURL || "",
-      password,
+      password: hashedPassword,
       createdAt: new Date(),
     };
 
@@ -67,7 +70,15 @@ router.post("/login", async (req, res) => {
       email,
     });
 
-    if (!user || user.password !== password) {
+    if (!user) {
+      return res.status(401).send({
+        message: "Invalid email or password",
+      });
+    }
+
+    const passwordMatched = await bcrypt.compare(password, user.password);
+
+    if (!passwordMatched) {
       return res.status(401).send({
         message: "Invalid email or password",
       });
@@ -102,6 +113,69 @@ router.post("/login", async (req, res) => {
   } catch (error) {
     res.status(500).send({
       message: "Failed to login",
+    });
+  }
+});
+
+// Google login
+router.post("/google", async (req, res) => {
+  try {
+    const { name, email, photoURL } = req.body;
+
+    if (!name || !email) {
+      return res.status(400).send({
+        message: "Name and email are required",
+      });
+    }
+
+    const db = getDB();
+
+    let user = await db.collection("users").findOne({ email });
+
+    if (!user) {
+      const newUser = {
+        name,
+        email,
+        photoURL: photoURL || "",
+        password: null,
+        provider: "google",
+        createdAt: new Date(),
+      };
+
+      const result = await db.collection("users").insertOne(newUser);
+
+      user = { ...newUser, _id: result.insertedId };
+    }
+
+    const token = jwt.sign(
+      {
+        userId: user._id.toString(),
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "7d",
+      },
+    );
+
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    res.send({
+      message: "Login successful",
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        photoURL: user.photoURL,
+      },
+    });
+  } catch (error) {
+    res.status(500).send({
+      message: "Failed to login with Google",
     });
   }
 });

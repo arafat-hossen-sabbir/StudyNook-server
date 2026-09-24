@@ -126,6 +126,25 @@ router.get("/my-listings", verifyToken, async (req, res) => {
   }
 });
 
+router.get("/latest", async (req, res) => {
+  try {
+    const db = getDB();
+
+    const rooms = await db
+      .collection("rooms")
+      .find({})
+      .sort({ createdAt: -1 })
+      .limit(6)
+      .toArray();
+
+    res.send(rooms);
+  } catch (error) {
+    res.status(500).send({
+      message: "Failed to fetch latest rooms",
+    });
+  }
+});
+
 router.get("/:id", async (req, res) => {
   try {
     const db = getDB();
