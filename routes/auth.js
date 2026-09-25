@@ -7,6 +7,15 @@ const verifyToken = require("../middleware/auth");
 
 const router = express.Router();
 
+const isProd = process.env.NODE_ENV === "production";
+
+const cookieOptions = {
+  httpOnly: true,
+  secure: isProd,
+  sameSite: isProd ? "none" : "strict",
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+};
+
 // Register user
 router.post("/register", async (req, res) => {
   try {
@@ -94,12 +103,7 @@ router.post("/login", async (req, res) => {
       },
     );
 
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    res.cookie("token", token, cookieOptions);
 
     res.send({
       message: "Login successful",
@@ -157,12 +161,7 @@ router.post("/google", async (req, res) => {
       },
     );
 
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    res.cookie("token", token, cookieOptions);
 
     res.send({
       message: "Login successful",
@@ -214,8 +213,8 @@ router.get("/me", verifyToken, async (req, res) => {
 router.post("/logout", (req, res) => {
   res.clearCookie("token", {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    secure: isProd,
+    sameSite: isProd ? "none" : "strict",
   });
 
   res.send({
